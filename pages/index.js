@@ -1,46 +1,60 @@
-import Layout from '../components/Layout'
-import Link from 'next/Link'
-export default function Home({ pokemon }) {
+import Navbar from '../components/Navbar'
+import Head from 'next/head'
+import PokemonCard from '../components/PokemonCard'
+import {useState} from 'react'
+export default function Home({ pokemons }) {
+  const [num , setNum] = useState(20)
   return (
-    <Layout title="Pokedex App">
-      <h1 className="text-4xl mb-8 text-center">Pokedex App</h1>
-      <ul>
-        {pokemon.map((poke, index) => (
-          <li key={index}>
-            <Link href={`/pokemon?id=${index + 1}`}>
-              <a className="border p-4 border-gray my-2 capitalize flex items-center text-lg bg-gray-200 rounded-md">
-                <img
-                  className="w-20 h-20 mr-3"
-                  src={`https://${poke.image}`}
-                  alt={poke.name}
-                />
-                <span className="mr-2 font-bold">{index + 1}</span>
-                {poke.name}
-              </a>
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </Layout>
+    <div className='bg-lightBlue min-h-screen'>
+      <Head>
+        <title>Kanto Pokedex</title>
+        <link rel='icon' href='/assets/pokeball-input-02.png' />
+      </Head>
+      <Navbar pokemons={ pokemons }/>
+      <div className='container max-w-screen-xl mx-auto grid gap-4 grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4  xl:grid-cols-5 px-4 pb-4 mt-8'>
+        {pokemons
+          .filter((_, idx) => idx < num)
+          .map(pokemon => (
+            <PokemonCard key={pokemon.id} {...pokemon} />
+          ))}
+      </div>
+      { num < 150 ? <div className='container max-w-screen-xl mx-auto flex justify-center py-8'>
+        <button className='bg-headerBlue text-lightBlue px-4 py-2 rounded-md hover:bg-darkBlue' onClick={() => setNum(num + 20)}>Load More</button>
+      </div> : ''}
+      
+    </div>
   )
 }
 
-export const getStaticProps = async (context) => {
+export const getStaticProps = async context => {
   try {
     const res = await fetch('https://pokeapi.co/api/v2/pokemon/?limit=150')
 
     const { results } = await res.json()
 
-    const pokemon = results.map((pokemon, index) => {
-      const paddedIndex = ('00' + (index + 1)).slice(-3)
-      const image = `assets.pokemon.com/assets/cms2/img/pokedex/full/${paddedIndex}.png`
-      return {
-        ...pokemon,
-        image,
-      }
+    const promises = []
+
+    results.forEach(pokemon => {
+      const { url } = pokemon
+      promises.push(fetch(url))
     })
+
+    const data = await Promise.all(promises)
+
+    const pokemons = await Promise.all(
+      data.map(async item => {
+        const { id, sprites, types, species } = await item.json()
+        return {
+          types,
+          id,
+          name: species.name,
+          img: sprites.front_default,
+        }
+      })
+    )
+
     return {
-      props: { pokemon },
+      props: { pokemons },
     }
   } catch (err) {
     console.log(err)
